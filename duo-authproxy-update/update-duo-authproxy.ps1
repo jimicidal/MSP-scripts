@@ -321,7 +321,7 @@ Function Repair-UpdateNeeded() {
     $DownloadURL = 'https://dl.duosecurity.com/duoauthproxy-latest.exe'
 
     #Save any downloads to this temp folder
-    $SavePath = 'c:\netxus\temp'
+    $SavePath = 'c:\temp'
 
     #Create the temp folder if it doesn't already exist
     if ( -not (Test-Path -Path $SavePath)) {New-Item -ItemType Directory -Path $SavePath}
