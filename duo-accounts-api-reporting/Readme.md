@@ -1,0 +1,2 @@
+# Duo Accounts API Reporting
+This PowerShell script generates a UI to view child accounts in your MSP tenant. Selecting a child organization allows you to view information you would otherwise have to log into the web UI to find.
