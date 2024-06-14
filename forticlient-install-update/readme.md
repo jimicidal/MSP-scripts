@@ -1,0 +1,2 @@
+# Forticlient install/update
+This script will check if you have FortiClient installed, find the latest available version number, and install it if necessary. It's meant for Datto RMM in that it checks for a Boolean input variable configured on the component screen in Datto. When you run the component, you can check a box to specify whether you want to automatically suspend BitLocker and reboot now.
