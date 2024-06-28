@@ -42,7 +42,7 @@ function New-DuoRequest(){
     $date = (Get-Date).ToUniversalTime().ToString("ddd, dd MMM yyyy HH:mm:ss -0000")
     $formattedParams = ($requestParams.Keys | Sort-Object | ForEach-Object {$_ + "=" + [uri]::EscapeDataString($requestParams.$_)}) -join "&"
     
-    #DUO Params formatted and stored as bytes with StringAPIParams
+    #Duo Params formatted and stored as bytes with StringAPIParams
     $requestToSign = (@(
         $Date.Trim(),
         $requestMethod.ToUpper().Trim(),
