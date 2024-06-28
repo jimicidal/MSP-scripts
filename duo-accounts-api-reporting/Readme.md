@@ -1,9 +1,6 @@
 # Duo Accounts API Reporting
-This PowerShell script generates a UI to view child accounts in your MSP tenant. Selecting a child organization allows you to view information you would otherwise have to log into the web UI to find.
+This PowerShell script generates useful reports about the child organizations in your Duo MSP tenant. It requires an Admin API and an Accounts API to be configured at the parent MSP account level. It works well, but is still a work in progress - so important things like avoiding hard-coded credentials are not observed here.
 
-It's pretty bare-bones, but it works. I'm working on converting it to a proper C# app.
+The script creates a folder structure in your output path of clientName > "Duo Security" > logYear > logMonth (e.g., d:\reports\Widgets-R-Us\Duo Security\2023\December). It massages the data received from Duo, generates some stylized HTML, then uses MSEdge.exe to print to PDF. Use your company's logo to make the reports production-ready.
 
-I've not included it here for obvious reasons, but you will need to provide your Duo Accounts API details for this to work. Specifically, set these three variables to their appropriate values:
-- $Duo_host
-- $Duo_skey
-- $Duo_ikey
+I've not included it here for obvious reasons, but you will need to provide your Duo Accounts API and Admin API details for this to work. More to come as I'm also working on making this into a proper c# app.
