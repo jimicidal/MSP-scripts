@@ -11,14 +11,18 @@ $Global:INSTALLED_CPP_REDIST_DISPLAY_NAME = "Microsoft Visual C\+\+ \d{4}(-\d{4}
 [System.version]$Global:CPP_MINIMUM_VERSION = '12.0.30501.0' # https://www.microsoft.com/en-us/download/details.aspx?id=40784
 $Global:CPP_URL_FORMAT = "https://download.microsoft.com/download/c/c/2/cc2df5f8-4454-44b4-802d-5ea68d086676/vcredist_{0}.exe"
 
+# Details for Java
+$Global:INSTALLED_JAVA_DISPLAY_NAME = "^Java.+(Development)?.*\d+(Update)?.+\d+"
+
 # Where to save downloaded files
 $Global:SavePath = "$($ENV:SystemDrive)\Temp"
 
-# Runtime preferences - these must be configured as combo boxes in the Datto component config
-$RequestedAction = $env:Action              # Update/Install/Uninstall  
-$RequestedVersion = $env:Version            # 8/11/17/21/22             
-$RequestedArchitecture = $env:Architecture  # x64/x86                   
-$RequestedEdition = $env:Edition            # jdk/jre                   
+# Runtime preferences - these must be configured in the Datto component config
+$RequestedAction = $env:Action              # Selection - Update/Install/Uninstall
+$RequestedVersion = $env:Version            # Selection - 8/11/17/21/22
+$RequestedArchitecture = $env:Architecture  # Selection - x64/x86/x64 and x86
+$RequestedEdition = $env:Edition            # Selection - jdk/jre
+$RequestedRemoveJava = $env:RemoveJava      # Boolean - $true/$false
 
 Function Find-InstalledSoftware() {
     #Return installed instances of the search string on this PC
@@ -101,6 +105,34 @@ Function Install-CppRedistributable() {
         exit 1
     }
 }
+Function Uninstall-Software() {
+    param (
+        $name
+    )
+
+    $InstalledSoftware = Find-InstalledSoftware $name
+
+    if ($null -eq $InstalledSoftware) {
+        write-host 'No action needed.'
+    } else {
+        $UninstallFailure = $false
+        foreach ($Instance in $InstalledSoftware) {
+            try {
+                write-host "Uninstalling $($Instance.displayname)..."
+                start-process msiexec.exe -argumentlist "/quiet /norestart /x$($Instance.pschildname)" -wait
+                write-host ' - Done.'
+            } catch {
+                write-host " - Failed to uninstall."
+                $UninstallFailure = $true
+            }
+        }
+
+        return $UninstallFailure
+    }
+
+    # Get installed version(s) once more to display updated list to the admin
+    $InstalledSoftware = Find-InstalledSoftware $name
+}
 Function Install-Corretto() {
     param (
         $vers,
@@ -138,6 +170,15 @@ Function Install-Corretto() {
         exit 1
     }
 }
+
+if ($RequestedRemoveJava -eq $true) {
+    write-host 'Job configured to uninstall Java.'
+    $FailureDetected = Uninstall-Software $INSTALLED_JAVA_DISPLAY_NAME
+    if ($FailureDetected) {
+        write-host 'Please remove Java manually.'
+    }
+}
+
 if ($RequestedAction -eq 'Update') {
     write-host 'Job configured to update existing Amazon Corretto installs.'
 
@@ -200,49 +241,56 @@ if ($RequestedAction -eq 'Update') {
 
         # If C++ redistributables are installed, check each one
         if ($InstalledCpp) {
-            foreach ($cpp in $InstalledCpp) {
-                if (($cpp.displayversion -ge $CPP_MINIMUM_VERSION) -and (($cpp.uninstallstring -match $Architecture) -or ($cpp.displayname -match $Architecture))) {
-                    # We found a version greater or equal to the minimum version, matching the architecture requested
-                    write-host 'C++ prerequisite already met.'
-                    $CppPrerequisiteMet = $true
-                    break
+            if (($Architecture -eq 'x86') -or ($Architecture -eq 'x64')) {
+                foreach ($cpp in $InstalledCpp) {
+                    if (($cpp.displayversion -ge $CPP_MINIMUM_VERSION) -and (($cpp.uninstallstring -match $Architecture) -or ($cpp.displayname -match $Architecture))) {
+                        # We found a version greater or equal to the minimum version, matching the architecture requested
+                        write-host 'C++ prerequisite already met.'
+                        $CppPrerequisiteMet = $true
+                        break
+                    }
+                }
+            } else { # Both architectures were requested
+                $x86PrerequisiteMet = $false
+                $x64PrerequisiteMet = $false
+                foreach ($cpp in $InstalledCpp) {
+                    if (($cpp.displayversion -ge $CPP_MINIMUM_VERSION) -and (($cpp.uninstallstring -match 'x86') -or ($cpp.displayname -match 'x86'))) {
+                        $x86PrerequisiteMet = $true
+                    } elseif (($cpp.displayversion -ge $CPP_MINIMUM_VERSION) -and (($cpp.uninstallstring -match 'x64') -or ($cpp.displayname -match 'x64'))) {
+                        $x64PrerequisiteMet = $true
+                    }
+                    if ($x86PrerequisiteMet -and $x64PrerequisiteMet) {
+                        write-host 'C++ prerequisite already met.'
+                        $CppPrerequisiteMet = $true
+                        break
+                    }
                 }
             }
         }
-        
+
         # If no sufficient C++ redistributable is installed, go get it
         if (-not $CppPrerequisiteMet) {
-            Install-CppRedistributable $Architecture
+            if (($Architecture -eq 'x86') -or ($Architecture -eq 'x64')) {
+                Install-CppRedistributable $Architecture
+            } else { # Both architectures were requested
+                if (-not $x86PrerequisiteMet) {Install-CppRedistributable 'x86'}
+                if (-not $x64PrerequisiteMet) {Install-CppRedistributable 'x64'}
+            }
         }
     }
 
     # We now have our prereqs sorted out, time to download/install Corretto
-    Install-Corretto $Version $Architecture $Edition
+    if (($Architecture -eq 'x86') -or ($Architecture -eq 'x64')) {
+        Install-Corretto $Version $Architecture $Edition
+    } else { # Both architectures were requested
+        Install-Corretto $Version 'x86' $Edition
+        Install-Corretto $Version 'x64' $Edition
+    }
 
     # Get installed version(s) once more to display updated list to the admin
     $InstalledCorretto = Find-InstalledSoftware $INSTALLED_CORRETTO_DISPLAY_NAME
 } elseif ($RequestedAction -eq 'Uninstall') {
     write-host 'Job configured to uninstall Amazon Corretto.'
-    $InstalledCorretto = Find-InstalledSoftware $INSTALLED_CORRETTO_DISPLAY_NAME
-
-    if ($null -eq $InstalledCorretto) {
-        write-host 'No action needed.'
-        exit
-    } else {
-        foreach ($Instance in $InstalledCorretto) {
-            try {
-                write-host "Uninstalling $($Instance.displayname)..."
-                start-process msiexec.exe -argumentlist "/quiet /norestart /x$($Instance.pschildname)" -wait
-                write-host ' - Done.'
-            } catch {
-                write-host " - Failed to uninstall."
-                $UninstallFailure = $true
-            }
-        }
-
-        if ($UninstallFailure) {exit 1}
-    }
-
-    # Get installed version(s) once more to display updated list to the admin
-    $InstalledCorretto = Find-InstalledSoftware $INSTALLED_CORRETTO_DISPLAY_NAME
+    $FailureDetected = Uninstall-Software $INSTALLED_CORRETTO_DISPLAY_NAME
+    if ($FailureDetected) {exit 1}
 }
