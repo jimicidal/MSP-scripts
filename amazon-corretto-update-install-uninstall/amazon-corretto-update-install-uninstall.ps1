@@ -1,6 +1,6 @@
 ﻿# Registry locations to check for installed software
-$Global:X64_REGISTRY_LOCATION = 'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\'
-$Global:X86_REGISTRY_LOCATION = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\'
+$Global:X64_REGISTRY_LOCATION = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\'
+$Global:X86_REGISTRY_LOCATION = 'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\'
 
 # Details for Amazon Corretto - https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/windows-install.html
 $Global:INSTALLED_CORRETTO_DISPLAY_NAME = 'Amazon Corretto'
