@@ -10,7 +10,7 @@ $Parent_ikey = ''
 $Parent_skey = ''
 $Parent_host = ''
 
-# Enter the root folder where subdirectories for each client will be created
+# Enter the folder where the csv will be created
 $OutputFolder = 'C:\Temp'
 
 
@@ -71,6 +71,27 @@ function New-DuoRequest(){
     return $httpRequest
 }
 
+# Convert a DateTime object to the Unix representation, assuming a local time was provided
+function ConvertTo-UnixTime() {
+    param ([DateTime]$LocalTime)
+
+    [DateTime]$UTCConversion = $LocalTime.ToUniversalTime()
+    [int64]$UnixTime = Get-Date($UTCConversion) -UFormat %s
+
+    return $UnixTime
+}
+
+# Convert Unix time object to a DateTime object and provide the local time representation
+function ConvertFrom-UnixTime() {
+    param ([int64]$UnixTime)
+
+    [DateTime]$EpochStart = New-Object -Type DateTime -ArgumentList 1970, 1, 1, 0, 0, 0, 0, Utc
+
+    [DateTime]$UTCConversion = $EpochStart.AddSeconds($UnixTime)
+    [DateTime]$StandardTime = $UTCConversion.ToLocalTime()
+
+    return $StandardTime
+}
 
 # Get a current list of all sub-accounts' names, account_ids, and api_hostnames
 function Get-ChildAccounts() {
@@ -145,7 +166,7 @@ $all_accts.add($parent_acct)
 # Declare a mutable collection of users
 $all_users = New-Object System.Collections.ArrayList
 
-# Loop through all child orgs and get user details
+# Loop through all child orgs and get integrations/users/etc. details
 ForEach ($org in $all_accts) {
     $child_acct_name = (($org.name).replace(':','').replace('\','').replace('/','').replace('?','').replace('*','').replace('"','').replace('<','').replace('>','').replace('|','')).trim('.')
     $child_acct_id = $org.account_id
@@ -167,9 +188,6 @@ ForEach ($org in $all_accts) {
                             @{Label="Email Address"; Expression={$_.email}}, `
                             @{Label="Status"; Expression={$_.status}}, `
                             @{Label="Last Login"; Expression={if ($null -ne $_.last_login) {ConvertFrom-UnixTime $_.last_login} else {"Never"}}}
-
     foreach ($uf in $usersFormatted) {$all_users.Add($uf)}
 }
-
-# Save to CSV
 $all_users | select-object Organization,Username,Name,"Email Address",Status,"Last Login" | Export-Csv -Path "$OutputFolder\DuoUsers.csv" -NoTypeInformation
