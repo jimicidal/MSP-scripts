@@ -1,5 +1,5 @@
 # Version number of the attached files
-$InstallerVersion = '6.0.36'
+$InstallerVersion = '8.0.13'
 
 # Runtime preferences - these must be configured in the Datto component config
 $RequestedProductType   =   $env:ProductType    # Selection - Desktop/Standalone/Hosting bundle
@@ -32,7 +32,7 @@ if ($RequestedProductType -eq 'Desktop') {
 } elseif ($RequestedProductType -eq 'Hosting bundle') {
   $x64Installer = $HostingBundleInstaller
 } else {
-  write-host 'No product type selected. Please choose the desktop version or standalone runtime.'
+  write-host 'No product type selected. Please choose between the desktop version, standalone runtime, or Windows hosting bundle.'
   exit 1
 }
 
