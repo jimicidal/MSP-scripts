@@ -14,13 +14,13 @@ $FCCPath = "$ENV:SystemDrive\Program Files\Fortinet\FortiClient\FCConfig.exe"
 
 #The custom temp folder and file name(s) we'll be working with
 $SavePath = "$ENV:SystemDrive\temp"
-$OnlineInstallerName = 'FortiClientVPNOnlineInstaller.exe'
+$OnlineInstallerName = 'FortiClientVPNInstaller.exe'
 $SettingsBackupFilename = 'FCTSettingsEnc.xml'
 
 #The URL to download the online installer. This was found at fortinet.com by going to
 #the FortiClient download page and using the 'inspect element' and 'developer tools'
 #browser features during a manual download
-$OnlineInstallerURL = "https://filestore.fortinet.com/forticlient/$OnlineInstallerName"
+$OnlineInstallerURL = "https://filestore.fortinet.com/forticlient/downloads/$OnlineInstallerName"
 
 #The FortiClient online installer's temp dir and related files
 #These are located in user's %localappdata%\temp instead when not running as SYSTEM
