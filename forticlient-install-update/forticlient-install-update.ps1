@@ -53,6 +53,7 @@ if ($null -ne $RegistryInstallObject) {
     Write-Host "$InstalledDisplayName $InstalledVersion is installed."
 } else {
     Write-Host "$InstalledDisplayName is not currently installed."
+    exit 1
 }
 
 #Quit if FCConfig.exe is not found - unless we're installing fresh
