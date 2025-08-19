@@ -56,7 +56,9 @@ $LatestDownloadURL = $($($WebPageContent.links.href | `
     Out-String).Trim()
 
 # Isolate the latest version number
-[System.Version]$LatestVersion = $($LatestDownloadURL.Substring($LatestDownloadURL.IndexOf("downloads/")+10).split("/")[0]).Trim()
+[System.Version]$LatestVersion = $($($WebPageContent.rawcontent | `
+                    Select-String -pattern '<div class="download-item-header download-version">v[0-9\.]+</div>').Matches.Value | `
+                    select-string -pattern '[0-9\.]+').matches.value
 write-host "The latest available version is $LatestVersion."
 
 # Determine whether an update is needed

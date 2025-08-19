@@ -468,8 +468,7 @@ elseif ($Requested.Architecture -match 'and') {
     $Requested.DisplayArch = ", $($Requested.Architecture -join ' & ')"
 } else {$Requested.DisplayArch = ", $($Requested.Architecture)"}
 
-# Set an actual Boolean value over Datto RMM's provided string value
-# You'll want to comment out this line for local testing outside of Datto RMM
+# Set an actual Boolean value over Datto RMM's provided string value - You'll want to comment this out for local testing
 if ($env:InputRemoveEOLVersions -eq $true) {$Requested.RemoveEOLVersions = $true} else {$Requested.RemoveEOLVersions = $false}
 
 #------------------------------------------------------------------
@@ -489,6 +488,8 @@ if ( -not (Test-Path -Path $SavePath)) {New-Item -ItemType Directory -Path $Save
 $ChangesMade = $false
 
 write-host # Blank line for STDOUT readability
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 if ($Requested.Procedure -eq 'Install') {
     write-host 'Installing requested products:'
