@@ -5,7 +5,7 @@
 $AuthliteServer = 'https://www.authlite.com/downloads/'
 
 # RegEx to match the DisplayName of AuthLite in the registry when installed
-$InstalledDisplayName = "^AuthLite [0-9\.]+$"
+$InstalledDisplayName = "^AuthLite [0-9\.]+"
 
 # Registry locations to check for existing installations
 $x64RegistryLocation = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\'
@@ -17,15 +17,13 @@ $SavePath = "$($ENV:SystemDrive)\temp"
 # Determine whether the Datto job is requesting the version number to be ignored
 if ($env:IgnoreInstalledVersionNumber -eq $true) {$ForceUpdate = $true} else {$ForceUpdate = $false}
 
+# Track whether any followup action needs to be taken
+$changesMade = $false
+
 # Find the installed AuthLite version if present on this PC
 try {
     $RegistryInstallObject = $null
-    #Check for AuthLite in x64 registry location
-    $RegistryInstallObject = Get-ItemProperty "$x64RegistryLocation*" | where-object -property displayname -Match $InstalledDisplayName
-    if ($null -eq $RegistryInstallObject) {
-        #Check for AuthLite in x86 registry location
-        $RegistryInstallObject = Get-ItemProperty "$x86RegistryLocation*" | where-object -property displayname -Match $InstalledDisplayName
-    }
+    $RegistryInstallObject = Get-ItemProperty "$x64RegistryLocation*","$x86RegistryLocation*" | where-object -property displayname -Match $InstalledDisplayName
 } catch {
     Write-host 'There was a problem checking the registry for AuthLite.'
     write-host $_
@@ -34,9 +32,9 @@ try {
 # Isolate the version number installed if present
 if ($null -ne $RegistryInstallObject) {
     [System.Version]$InstalledVersion = $RegistryInstallObject.displayversion
-    Write-host "AuthLite v$InstalledVersion is already installed."
+    Write-host "AuthLite $InstalledVersion is already installed."
 } else {
-    Write-host 'AuthLite is not already installed.'
+    Write-host 'AuthLite is not found on this device.'
 }
 
 # Switch to TLS1.2 and grab the contents of the download page
@@ -44,8 +42,7 @@ if ($null -ne $RegistryInstallObject) {
 try {
     $WebPageContent = Invoke-WebRequest $AuthliteServer -UseBasicParsing
 } catch {
-    Write-host 'There was a problem getting the latest available version of AuthLite.'
-    Write-host 'Cannot continue downloading the installer.'
+    Write-host 'There was a problem getting the latest available version of AuthLite. Cannot continue.'
     write-host $_
     exit 1
 }
@@ -61,22 +58,22 @@ $LatestDownloadURL = $($($WebPageContent.links.href | `
                     select-string -pattern '[0-9\.]+').matches.value
 write-host "The latest available version is $LatestVersion."
 
-# Determine whether an update is needed
-if (($null -ne $RegistryInstallObject) -and ($InstalledVersion -ge $LatestVersion) -and (-not $ForceUpdate)) {
-    write-host "Installed version $InstalledVersion does not need an update."
+# State if no update is needed
+if (($null -ne $RegistryInstallObject) -and ($InstalledVersion -ge $LatestVersion)) {
+    write-host 'An update is not needed.'
 }
 
 # Proceed if installing new or if the engineer requested to ignore the installed version
 if (($null -eq $RegistryInstallObject) -or ($ForceUpdate)) {
     # Create the save path if necessary and go there
-    if ( -not (Test-Path -Path $SavePath)) {New-Item -ItemType Directory -Path $SavePath}
+    if ( -not (Test-Path -Path $SavePath)) {New-Item -ItemType Directory -Path $SavePath | out-null}
     Set-Location $SavePath
 
-    if (($null -ne $RegistryInstallObject) -and ($ForceUpdate)) {Write-Host 'Job configured to ignore installed version.'}
-    
+    if (($null -ne $RegistryInstallObject) -and ($ForceUpdate)) {Write-Host 'This job is configured to ignore the installed version number.'}
+
     # Try to download the installer
     try {
-        Write-host 'Downloading...'
+        Write-host ' - Downloading...'
         Invoke-WebRequest -URI $LatestDownloadURL -OutFile "$SavePath\AuthLite_installer_x64.msi"
     } catch {
         Write-host 'There was a problem downloading the installer.'
@@ -86,12 +83,25 @@ if (($null -eq $RegistryInstallObject) -or ($ForceUpdate)) {
     
     # Try to run the installer
     try {
-        Write-host 'Installing...'
+        Write-host ' - Installing...'
         Start-Process msiexec -ArgumentList "/i AuthLite_installer_x64.msi /quiet /norestart" -Wait
-        Write-host 'Done!'
+        $changesMade = $true
     } catch {
         Write-host 'There was a problem installing AuthLite.'
         write-host $_
         exit 1
+    }
+}
+
+# This reboot flag is specifically for Datto RMM. You can choose to reboot another way if needed
+if ($changesMade) {
+    if ((Get-Module -ListAvailable -Name "ServerManager") -and `
+            (Get-WindowsFeature -name 'AD-Domain-Services' | where-object installed -eq $true)) {
+        Write-Host 'Domain controller detected, setting reboot flag.'
+        try {
+            set-content -Path "$env:systemdrive\ProgramData\CentraStage\reboot.flag" -Value '' -Force
+        } catch {
+
+        }
     }
 }
