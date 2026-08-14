@@ -449,7 +449,7 @@ $Requested = [pscustomobject]@{
 
 ################################################################### Hard-coded values for local testing outside of Datto RMM ###########################################
 $Requested = [pscustomobject]@{
-    Procedure = 'Audit EOL dates' # Uninstall channel | Uninstall specific version | Update | Install
+    Procedure = 'Upgrade to channel' # Uninstall channel | Uninstall specific version | Update | Install
     Product = 'Standalone runtime'
     Channel = '10.0'
     Architecture = 'win-x64' #x64 and x86'
@@ -483,7 +483,7 @@ write-host "`r`nCurrently installed products:"
 $InstalledDotnetInstances = Get-InstalledInstances -PrintToScreen
 
 # Create the temp folder if it doesn't already exist
-if ( -not (Test-Path -Path $SavePath)) {New-Item -ItemType Directory -Path $SavePath}
+if ( -not (Test-Path -Path $SavePath)) {New-Item -ItemType Directory -Path $SavePath | Out-Null}
 
 # Track whether we've added or removed any versions of .NET Core
 $ChangesMade = $false
