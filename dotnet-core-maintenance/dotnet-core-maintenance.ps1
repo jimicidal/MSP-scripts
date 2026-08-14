@@ -1,7 +1,7 @@
 <# This script is made for Datto RMM and requires input variables configured for the component to run properly:
     InputProcedure          Selection   Install | Update | Upgrade to channel | Audit EOL dates | Keep latest | Uninstall channel | Uninstall specific version | Uninstall all
     InputProduct            Selection   Hosting bundle | ASP.NET runtime | Desktop runtime | Standalone runtime | SDK
-    InputChannel            Selection   5.0 | 6.0 | 7.0 | 8.0 | 9.0
+    InputChannel            Selection   5.0 | 6.0 | 7.0 | 8.0 | 9.0 | 10.0
     InputArchitecture       Selection   win-x64 | win-x86 | x64 and x86
     InputSpecificVersion    Text box    e.g. 8.0.16
     InputRemoveEOLVersions  Boolean     $true | $false #>
@@ -31,7 +31,7 @@ $DotnetProductNames.Add([PSCustomObject]@{
                             URLName = 'aspnetcore-runtime'}) | Out-Null
 $DotnetProductNames.Add([PSCustomObject]@{
                             FriendlyName = 'Desktop runtime'
-                            InstalledName = '(Microsoft Windows Desktop Runtime \- )'
+                            InstalledName = '(Microsoft Windows Desktop Runtime )'
                             URLName = 'windowsdesktop'}) | Out-Null
 $DotnetProductNames.Add([PSCustomObject]@{
                             FriendlyName = 'Standalone runtime'
@@ -73,7 +73,7 @@ Function Get-InstalledInstances {
 
     try {
         # Try to find all installed packages that match the regular expressions above
-        $InstalledPackages = get-package -providername 'Programs' -force | where-object {($_.name -match $CombinedProductNames)}
+        $InstalledPackages = get-package -providername 'Programs' -WarningAction SilentlyContinue -force | where-object {($_.name -match $CombinedProductNames)}
     } catch {
         write-host 'There was a problem finding installed instances of .NET core.'
         write-host $_
@@ -189,7 +189,7 @@ Function Find-DownloadURL() {
     try {
         $FeedContent = (Invoke-webrequest $ReleaseFeedURL -UseBasicParsing).'content'
     } catch {
-        write-host "There was a problem loading release feed URL $ReleaseFeedURL."
+        write-host "There was a problem loading release feed URL '$ReleaseFeedURL'."
         write-host $_
         return $null
     }
@@ -206,13 +206,14 @@ Function Find-DownloadURL() {
     try {
         $ProductEOLDate = (($FeedContent | convertfrom-json).'eol-date' | get-date -ErrorAction Ignore)
     } catch {
-        write-host "There was a problem getting the EOL date for channel $Channel."
+        write-host "There was a problem getting the EOL date for channel '$Channel'."
     }
 
-    #$FoundObject = ($FeedContent | convertfrom-json | Select-Object -ExpandProperty 'releases' | where-object 'release-version' -eq "$Version" | Select-Object -ExpandProperty "$Product" | Select-Object -ExpandProperty 'files' | where-object {($_.rid -eq "$architecture") -and ($_.name -match ".exe$")})
-    # Specific SDKs are found in a slightly different area vs other products
-    if (($Product -eq 'sdk')<# -and ($PsCmdlet.ParameterSetName -eq 'Specific')#>) {
+    # SDKs are found in a slightly different area vs other products
+    if ($Product -eq 'sdk' -and ($PsCmdlet.ParameterSetName -eq 'Specific')) {
         $FoundObject = $($($($FeedContent | convertfrom-json).releases.sdks | where-object 'version' -eq "$Version").'files' | where-object {($_.rid -eq "$architecture") -and ($_.name -match ".exe$")})
+    } elseif ($Product -eq 'sdk' -and ($PsCmdlet.ParameterSetName -ne 'Specific')) {
+        $FoundObject = $($($($FeedContent | convertfrom-json).releases.sdks | where-object 'version' -eq "$ProductLatestSDK").'files' | where-object {($_.rid -eq "$architecture") -and ($_.name -match ".exe$")})
     } else {
         $FoundObject = $($($($($FeedContent | convertfrom-json).releases | where-object 'release-version' -eq "$Version")."$Product").'files' | where-object {($_.rid -eq "$architecture") -and ($_.name -match ".exe$")})
     }
@@ -245,7 +246,7 @@ Function Get-Installer() {
         [string]$Product,               # runtime | sdk | aspnetcore-runtime | windowsdesktop
 
         [Parameter(Mandatory=$true, ParameterSetName='Latest')]
-        [string]$Channel,               # 9.0 | 8.0 | 7.0 | 6.0 | 5.0
+        [string]$Channel,               # 10.0 | 9.0 | 8.0 | 7.0 | 6.0 | 5.0
 
         [Parameter(Mandatory=$false, ParameterSetName='Latest')]
         [Parameter(Mandatory=$false, ParameterSetName='Specific')]
@@ -270,14 +271,17 @@ Function Get-Installer() {
     }
 
     if ($null -eq ($NewInstaller.FileName)) {
-        write-host 'There was a problem finding an installer to download.'
+        # write-host 'There was a problem finding an installer to download.'
         return
     } else {
+        # Add version to filename
+        $NewInstaller.FileName = $($NewInstaller.RequestedVersion + '_' + $NewInstaller.FileName)
+
         # Download and save the file to our $SavePath
         try {
             Invoke-WebRequest $NewInstaller.URL -OutFile "$SavePath\$($NewInstaller.FileName)" -UseBasicParsing
         } catch {
-            write-host "There was a problem downloading $($NewInstaller.FileName)."
+            write-host "There was a problem downloading '$($NewInstaller.FileName)'."
             write-host $_
             return
         }
@@ -291,7 +295,7 @@ Function Get-Installer() {
             write-host 'SHA512 hash did not match the hash provided by Microsoft.'
             try {
                 Remove-Item "$SavePath\$($NewInstaller.FileName)"
-                write-host "Downloaded file $($NewInstaller.FileName) was deleted."
+                write-host "Downloaded file '$($NewInstaller.FileName)' was deleted."
             } catch {
                 write-host 'There was a problem deleting the downloaded file.'
                 write-host $_
@@ -313,7 +317,7 @@ Function Install-Uninstall() {
 
     # Check that the filename provided is valid
     if ( -not (Test-Path "$SavePath\$FileName")) {
-        Write-Host "There was a problem with the path $SavePath\$FileName."
+        Write-Host "There was a problem with the path '$SavePath\$FileName'."
         Write-Host 'Unable to process this file.'
         return
     }
@@ -322,17 +326,15 @@ Function Install-Uninstall() {
     if (($Procedure -eq 'Install') -or ($Procedure -eq 'Uninstall')) {
         $ChosenArguments = "/" + $Procedure.ToLower() + " /quiet /norestart"
     } else {
-        Write-Host "There was a problem with the request to $procedure $FileName."
+        Write-Host "There was a problem with the request to '$procedure $FileName'."
         return
     }
 
     # Do the thing
     try {
-        #write-host $Procedure"ing..."
         Start-Process -FilePath "$SavePath\$FileName" -ArgumentList $ChosenArguments -wait
-        #write-host 'OK!'
     } catch {
-        Write-Host "There was a problem trying to"$Procedure.ToLower()"$Filename."
+        Write-Host "There was a problem trying to"$Procedure.ToLower()"the file '$Filename'."
         Write-Host $_
     }
 }
@@ -369,7 +371,6 @@ function Find-EolDates {
         $ExpiringProducts = [System.Collections.ArrayList]::new()
 
         foreach ($Product in $InstalledProducts) {
-            #$Record = Find-DownloadURL -Product $Product.NameObject.URLName -Architecture $Product.Architecture -Version $Product.Version
             $Record = Find-DownloadURL -InstallObject $Product
             $Expiration = Get-Date $Record.EOLDate -DisplayHint 'Date'
             if ($Expiration -le $Today) {$ExpiredProducts.Add($Product) | Out-Null}
@@ -448,13 +449,13 @@ $Requested = [pscustomobject]@{
 
 ################################################################### Hard-coded values for local testing outside of Datto RMM ###########################################
 $Requested = [pscustomobject]@{
-    Procedure = 'Update'                # Uninstall channel | Uninstall specific version | Keep latest
-    Product = 'Standalone runtime'      # Hosting bundle | ASP.NET runtime
-    Channel = '7.0'
-    Architecture = 'win-x64'            # 'x64 and x86'
+    Procedure = 'Audit EOL dates' # Uninstall channel | Uninstall specific version | Update | Install
+    Product = 'Standalone runtime'
+    Channel = '10.0'
+    Architecture = 'win-x64' #x64 and x86'
     DisplayArch = $null
     SpecificVersion = '7.0.20'
-    RemoveEOLVersions = $true
+    RemoveEOLVersions = '$true'
 }
 ################################################################### Hard-coded values for local testing outside of Datto RMM ###########################################>
 
@@ -468,7 +469,7 @@ elseif ($Requested.Architecture -match 'and') {
     $Requested.DisplayArch = ", $($Requested.Architecture -join ' & ')"
 } else {$Requested.DisplayArch = ", $($Requested.Architecture)"}
 
-# Set an actual Boolean value over Datto RMM's provided string value - You'll want to comment this out for local testing
+# Set an actual Boolean value over Datto RMM's provided string value
 if ($env:InputRemoveEOLVersions -eq $true) {$Requested.RemoveEOLVersions = $true} else {$Requested.RemoveEOLVersions = $false}
 
 #------------------------------------------------------------------
@@ -492,14 +493,22 @@ write-host # Blank line for STDOUT readability
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 if ($Requested.Procedure -eq 'Install') {
+    $CurrentInstaller = $null
+
     write-host 'Installing requested products:'
+
     # Loop through 0-2 architectures and download/process each one
     foreach ($arch in $Requested.Architecture) {
         write-host " - Installing $($Requested.Product.FriendlyName) $($arch)..."
-        Get-Installer -product $Requested.Product.URLName -channel $Requested.Channel -architecture $arch | Install-Uninstall -Procedure 'Install'
-        $ChangesMade = $true
+        $CurrentInstaller = Get-Installer -product $Requested.Product.URLName -channel $Requested.Channel -architecture $arch
+        if ($CurrentInstaller) {
+            $CurrentInstaller | Install-Uninstall -Procedure 'Install'
+            $ChangesMade = $true
+        }
     }
 } elseif ($Requested.Procedure -eq 'Update') {
+    $CurrentInstaller = $null
+
     write-host 'Updating products:'
 
     # Loop through installed products and compare their version against the latest available
@@ -514,9 +523,19 @@ if ($Requested.Procedure -eq 'Install') {
 
             # Update if needed and keep track of whether any changes needed to be made
             if ($prod.Version -lt $CompareVersion) {
-                write-host " - Updating $($prod.NameObject.FriendlyName) $($prod.Channel) $($prod.Architecture)..."
-                Get-Installer -Product $prod.NameObject.URLName -Channel $prod.Channel -Architecture $prod.Architecture | Install-Uninstall -Procedure 'Install'
-                $ChangesMade = $true
+                write-host " - Updating $($prod.NameObject.FriendlyName) $($prod.Version) $($prod.Architecture)..."
+                $CurrentInstaller = Get-Installer -Product $prod.NameObject.URLName -Channel $prod.Channel -Architecture $prod.Architecture
+                if ($CurrentInstaller) {
+                    $CurrentInstaller | Install-Uninstall -Procedure 'Install'
+                    $ChangesMade = $true
+                }
+                if ($prod.NameObject.FriendlyName -eq 'SDK') {
+                    $CurrentInstaller = Get-Installer -product $prod.NameObject.URLName -architecture $prod.architecture -version $prod.version
+                    if ($CurrentInstaller) {
+                        $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                        $ChangesMade = $true
+                    }
+                }
             }
         }
         if (-not $ChangesMade) {write-host ' - No updates needed.'}
@@ -524,6 +543,8 @@ if ($Requested.Procedure -eq 'Install') {
         write-host ' - No products installed.'
     }
 } elseif ($Requested.Procedure -eq 'Upgrade to channel') {
+    $CurrentInstaller = $null
+
     write-host 'Upgrading products:'
 
     # Loop though installed products and check if they are from a lesser channel number
@@ -531,18 +552,23 @@ if ($Requested.Procedure -eq 'Install') {
         foreach ($prod in $InstalledDotnetInstances) {
             if ($prod.channel -lt $Requested.Channel) {
                 # If it needs to be upgraded, install the latest version from the new channel and remove the old one
-                write-host " - Upgrading $($prod.NameObject.FriendlyName) $($prod.architecture)..."
-                Get-Installer -product $prod.NameObject.URLName -channel $Requested.Channel -architecture $prod.architecture | Install-Uninstall -Procedure 'Install'
-                Get-Installer -product $prod.NameObject.URLName -channel $prod.channel -architecture $prod.architecture | Install-Uninstall -Procedure 'Uninstall'
-                $ChangesMade = $true
+                write-host " - Upgrading $($prod.NameObject.FriendlyName) $($prod.version) $($prod.architecture)..."
+                $CurrentInstaller = Get-Installer -product $prod.NameObject.URLName -channel $Requested.Channel -architecture $prod.architecture
+                if ($CurrentInstaller) {
+                    $CurrentInstaller | Install-Uninstall -Procedure 'Install'
+                    $ChangesMade = $true
+                }
+                $CurrentInstaller = Get-Installer -product $prod.NameObject.URLName -architecture $prod.architecture -version $prod.version
+                if ($CurrentInstaller) {
+                    $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                    $ChangesMade = $true
+                }
             }
         }
         if (-not $ChangesMade) {write-host ' - No upgrades needed.'}
     } else {
         write-host ' - No products installed.'
     }
-
-    if ($ChangesMade -eq $false) {write-host 'No upgrades needed.'}
 } elseif ($Requested.Procedure -eq 'Audit EOL dates') {
     write-host 'End-of-life audit:'
     if ($InstalledDotnetInstances) {
@@ -551,6 +577,8 @@ if ($Requested.Procedure -eq 'Install') {
         write-host ' - No products installed.'
     }
 } elseif ($Requested.Procedure -eq 'Keep latest') {
+    $CurrentInstaller = $null
+
     write-host 'Checking for duplicates:'
 
     if ($InstalledDotnetInstances) {
@@ -575,8 +603,11 @@ if ($Requested.Procedure -eq 'Install') {
         if ($EntriesToRemove) {
             foreach ($Entry in $EntriesToRemove) {
                 write-host " - Removing $($Entry.NameObject.FriendlyName) $($Entry.Version) $($Entry.Architecture)..."
-                Get-Installer -Product $Entry.NameObject.URLName -Architecture $Entry.Architecture -Version $Entry.Version | Install-Uninstall -Procedure 'Uninstall'
-                $ChangesMade = $true
+                $CurrentInstaller = Get-Installer -Product $Entry.NameObject.URLName -Architecture $Entry.Architecture -Version $Entry.Version
+                if ($CurrentInstaller) {
+                    $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                    $ChangesMade = $true
+                }
             }
         } else {
             write-host ' - No duplicates to remove.'
@@ -585,6 +616,8 @@ if ($Requested.Procedure -eq 'Install') {
         write-host ' - No products installed.'
     }
 } elseif ($Requested.Procedure -eq 'Uninstall channel') {
+    $CurrentInstaller = $null
+
     Write-Host 'Uninstalling products:'
 
     # Loop through installed products and check for any that match our channel
@@ -592,8 +625,11 @@ if ($Requested.Procedure -eq 'Install') {
         foreach ($prod in $InstalledDotnetInstances) {
             if ($prod.channel -eq $Requested.Channel) {
                 write-host " - Removing $($prod.NameObject.FriendlyName) $($prod.Version) $($prod.Architecture)..."
-                Get-Installer -Product $prod.NameObject.URLName -Architecture $prod.Architecture -Version $prod.Version | Install-Uninstall -Procedure 'Uninstall'
-                $ChangesMade = $true
+                $CurrentInstaller = Get-Installer -Product $prod.NameObject.URLName -Architecture $prod.Architecture -Version $prod.Version
+                if ($CurrentInstaller) {
+                    $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                    $ChangesMade = $true
+                }
             }
         }
 
@@ -602,6 +638,8 @@ if ($Requested.Procedure -eq 'Install') {
         write-host ' - No products installed.'
     }
 } elseif ($Requested.Procedure -eq 'Uninstall specific version') {
+    $CurrentInstaller = $null
+
     write-host 'Uninstalling requested product:'
 
     # Loop through installed products and check for any that match our specific version/architecture
@@ -621,8 +659,11 @@ if ($Requested.Procedure -eq 'Install') {
         if ($EntriesToRemove) {
             foreach ($Entry in $EntriesToRemove) {
                 write-host " - Removing $($Entry.NameObject.FriendlyName) $($Entry.Version) $($Entry.Architecture)..."
-                Get-Installer -Product $Entry.NameObject.URLName -Architecture $Entry.Architecture -Version $Entry.Version | Install-Uninstall -Procedure 'Uninstall'
-                $ChangesMade = $true
+                $CurrentInstaller = Get-Installer -Product $Entry.NameObject.URLName -Architecture $Entry.Architecture -Version $Entry.Version
+                if ($CurrentInstaller) {
+                    $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                    $ChangesMade = $true
+                }
             }
         } else {
             write-host ' - No matching products to remove.'
@@ -631,18 +672,25 @@ if ($Requested.Procedure -eq 'Install') {
         write-host ' - No products installed.'
     }
 } elseif ($Requested.Procedure -eq 'Uninstall all') {
+    $CurrentInstaller = $null
+
     Write-Host 'Uninstalling products:'
     # Loop through installed products and remove each one
     if ($InstalledDotnetInstances) {
         foreach ($prod in $InstalledDotnetInstances) {
             write-host " - Removing $($prod.NameObject.FriendlyName) $($prod.Channel) $($prod.Architecture)..."
-            Get-Installer -Product $prod.NameObject.URLName -Architecture $prod.Architecture -Version $prod.Version | Install-Uninstall -Procedure 'Uninstall'
-            $ChangesMade = $true
+            $CurrentInstaller = Get-Installer -Product $prod.NameObject.URLName -Architecture $prod.Architecture -Version $prod.Version
+            if ($CurrentInstaller) {
+                $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                $ChangesMade = $true
+            }
         }
     } else {write-host ' - No products installed.'}
 }
 
 if ($Requested.RemoveEOLVersions) {
+    $CurrentInstaller = $null
+
     $InstalledDotnetInstances = Get-InstalledInstances
 
     Write-Host "`r`nEnd-of-life removal:"
@@ -651,8 +699,11 @@ if ($Requested.RemoveEOLVersions) {
         $Removals = Find-EolDates -InstalledProducts $InstalledDotnetInstances
         foreach ($Entry in $Removals) {
             write-host " - Removing $($Entry.NameObject.FriendlyName) $($Entry.Channel) $($Entry.Architecture)..."
-            Find-DownloadURL -InstallObject $Entry | Get-Installer | Install-Uninstall -Procedure 'Uninstall'
-            $changesMade = $true
+            $CurrentInstaller = $(Find-DownloadURL -InstallObject $Entry | Get-Installer)
+            if ($CurrentInstaller) {
+                $CurrentInstaller | Install-Uninstall -Procedure 'Uninstall'
+                $ChangesMade = $true
+            }
         }
     } else {
         write-host ' - No EOL products installed.'
