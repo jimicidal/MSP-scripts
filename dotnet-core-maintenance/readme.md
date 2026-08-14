@@ -1,7 +1,7 @@
 # .NET core maintenance
 This script is written for Datto RMM. It will fetch installers from microsoft.com to execute any install or uninstall tasks you select at runtime. You can also manually set your runtime preferences in the script to decide what it does when running it locally on a device. The procedures this script can perform are outlined below - it will also run an end-of-life date check for the installed products before it exits.
 
-This has not been tested with .NET Core versions lower than 5. It's also not meant to work with preview editions as you're likely not running them in production anyway. When channel 10 is no longer in preview, you should be able to just add it to the channel selection field in the component configuration screen of Datto RMM to deploy it with this script.
+This has not been tested with .NET Core versions lower than 5. It's also not meant to work with preview editions as you're likely not running them in production anyway.
 
 # Available procedures
 - Install
@@ -45,6 +45,7 @@ This has not been tested with .NET Core versions lower than 5. It's also not mea
     - 7.0
     - 8.0
     - 9.0
+    - 10.0
 - InputArchitecture (Selection)
     - win-x64
     - win-x86
