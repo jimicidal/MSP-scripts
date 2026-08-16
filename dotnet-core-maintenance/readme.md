@@ -9,7 +9,7 @@ This script is written for Datto RMM - use the "component setup" section below t
 - Update
     - Installs any available updates for each installed product. This keeps everything within the same channel; it will not move you to channel 10, for example, if you have 8 installed.
 - Upgrade to channel
-    - Replaces installed lower-channel products with the latest version in the target channel. It will upgrade e.g. channel 6 products to channel 8, but leave channel 10 products alone.
+    - Replaces installed lower-channel products with the latest version in the target channel. It will upgrade e.g. channel 6 products to channel 8 while leaving channel 10 products alone.
 - Audit EOL dates
     - Checks end-of-life dates for the products you have installed. It will report expired products and any that are expiring within 90 days. Since the script already does this regardless of which procedure you select, this is essentially a read-only run of the script (unless you also chose the InputRemoveEOLVersions option at runtime).
 - Keep latest
