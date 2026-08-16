@@ -1,7 +1,7 @@
 # .NET core maintenance
 This script is written for Datto RMM - use the "component setup" section below to configure the component's "variables". The code will fetch installers from microsoft.com to install or uninstall products based on the procedure you requested. To run it outside the Datto RMM platform, just set your runtime preferences in (and uncomment) the testing section around line 450. The procedures this script can perform are outlined below.
 
-Untested with preview editions and .NET Core versions lower than 5!
+**Untested with preview editions and .NET Core versions lower than 5!**
 
 # Available procedures
 - Install
