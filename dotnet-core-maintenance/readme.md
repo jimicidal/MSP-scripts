@@ -11,7 +11,8 @@ This script is written for Datto RMM - use the "component setup" section below t
 - Upgrade to channel
     - Replaces installed lower-channel products with the latest version in the target channel. It will upgrade e.g. channel 6 products to channel 8 while leaving channel 10 products alone.
 - Audit EOL dates
-    - Checks end-of-life dates for the products you have installed. It will report expired products and any that are expiring within 90 days. Since the script already does this regardless of which procedure you select, this is essentially a read-only run of the script (unless you also chose the InputRemoveEOLVersions option at runtime).
+    - Checks end-of-life dates for the products you have installed. It will report expired products and any that are expiring within 90 days.
+    - Since the script already does this regardless of which procedure you select, this is essentially a read-only run (unless you also choose the InputRemoveEOLVersions option at runtime).
 - Keep latest
     - Checks for multiple versions/instances of the same installed products and removes all but the one with the highest version number.
 - Uninstall channel
@@ -19,7 +20,7 @@ This script is written for Datto RMM - use the "component setup" section below t
 - Uninstall specific version
     - Surgical removal of an installed product based on the product/version/architecture you specify.
 - Uninstall all
-    - Web hosting bundles, SDKs, ASP.NET, all of it.
+    - Web hosting bundles, SDKs, ASP.NET, channel 9, channel 10, all of it.
 - RemoveEOLVersions
     - This is a checkbox in Datto RMM, outside of the combo box selections above. It will perform the EOL audit and remove anything that has already expired. Good for when you have a current channel installed alongside EOL channels and want to run the Update procedure while getting rid of the old stuff.
 
