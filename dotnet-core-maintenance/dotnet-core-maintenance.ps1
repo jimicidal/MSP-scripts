@@ -447,7 +447,7 @@ $Requested = [pscustomobject]@{
     RemoveEOLVersions = $env:InputRemoveEOLVersions     # Further processed below
 }
 
-################################################################### Hard-coded values for local testing outside of Datto RMM ###########################################
+<################################################################### Hard-coded values for local testing outside of Datto RMM ###########################################
 $Requested = [pscustomobject]@{
     Procedure = 'Upgrade to channel' # Uninstall channel | Uninstall specific version | Update | Install
     Product = 'Standalone runtime'
