@@ -27,7 +27,7 @@ $DotnetProductNames.Add([PSCustomObject]@{
                             URLName = 'aspnetcore-runtime'}) | Out-Null
 $DotnetProductNames.Add([PSCustomObject]@{
                             FriendlyName = 'ASP.NET runtime'
-                            InstalledName = '(Microsoft ASP\.NET Core .* \- Shared Framework)'
+                            InstalledName = '(Microsoft ASP\.NET Core )'
                             URLName = 'aspnetcore-runtime'}) | Out-Null
 $DotnetProductNames.Add([PSCustomObject]@{
                             FriendlyName = 'Desktop runtime'
